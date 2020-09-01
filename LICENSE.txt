@@ -1,0 +1,11 @@
+Copyright (C) 2020 Stephen Fedele <32551324+strangeprogrammer@users.noreply.github.com>
+
+This program and all source files marked as belonging to this program are
+licensed under the terms of the GNU Lesser General Public License,
+version 3 or any later version, but with the following additional terms:
+
+	As per Section 7, Term 'c', Clauses 1 and 2 of the GNU General
+	Public License version 3, misrepresentation of the origin of this
+	material is prohibited, and modified versions of such material
+	are required to be marked in reasonable ways as different from
+	the original version.
