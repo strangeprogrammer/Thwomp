@@ -119,7 +119,7 @@ def _dict_unt(bobj):		return dict(map(_list_unt, _list_unt(bobj)))
 
 ### Frontend Interface
 
-actions = {
+codecs = {
 	"bytes":	[_bytes_twp,		_bytes_unt],
 	"str":		[_str_twp,		_str_unt],
 	"int":		[_int_twp,		_int_unt],
@@ -136,7 +136,7 @@ def Thwomp(x):
 	
 	try:
 		t = type(x).__name__
-		thwomper = actions[t][0]
+		thwomper = codecs[t][0]
 	except Exception:
 		raise Exception("Error: object of type '" + type(x).__name__ + "' couldn't be serialized...")
 	
@@ -147,7 +147,7 @@ def Unthwomp(bobj):
 	
 	try:
 		[t, bobj] = peel(bobj)
-		unthwomper = actions[bytesToStr(t)][1]
+		unthwomper = codecs[bytesToStr(t)][1]
 	except Exception:
 		raise Exception("Error: object of type '" + t + "' couldn't be deserialized...")
 	return unthwomper(peel(bobj)[0]) # We don't use 'skipVLQ' since this function uses the length given, while skipVLQ does not
