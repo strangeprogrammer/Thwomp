@@ -1,22 +1,22 @@
 #!/bin/python3
 
-# Thwomp is a python3 library used for (de)serialization between python data objects and bytes strings.
+# ToBeGreen is a python3 library used for (de)serialization between python data objects and bytes strings.
 # Copyright (C) 2020 Stephen Fedele <32551324+strangeprogrammer@users.noreply.github.com>
 # 
-# This file is part of Thwomp.
+# This file is part of ToBeGreen.
 # 
-# Thwomp is free software: you can redistribute it and/or modify
+# ToBeGreen is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 # 
-# Thwomp is distributed in the hope that it will be useful,
+# ToBeGreen is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
 # You should have received a copy of the GNU General Public License
-# and the GNU Lesser General Public License along with Thwomp.  If not, see
+# and the GNU Lesser General Public License along with ToBeGreen.  If not, see
 # <https://www.gnu.org/licenses/>.
 # 
 # Additional terms apply to this file.  Read the file 'LICENSE.txt' for
@@ -80,77 +80,77 @@ def peel(bobj):
 		bobj[blength : ], # What we didn't expect to receive
 	]
 
-### Thwompers
+### Serializers
 
-def _bytes_twp(x):		return bytes(x)
-def _str_twp(x):		return strToBytes(x)
-def _int_twp(x):		return intToVLQ(x)
-def _bool_twp(x):		return b"\xFF" if x else b"\x00"
+def _bytes_ser(x):		return bytes(x)
+def _str_ser(x):		return strToBytes(x)
+def _int_ser(x):		return intToVLQ(x)
+def _bool_ser(x):		return b"\xFF" if x else b"\x00"
 
-def _list_twp(x):
+def _list_ser(x):
 	bobj = b""
 	for y in x:
-		bobj += pascalify(Thwomp(y))
+		bobj += pascalify(Ser(y))
 	return bobj
 
-def _tuple_twp(x):		return _list_twp(x)
-def _set_twp(x):		return _list_twp(x)
-def _frozenset_twp(x):		return _list_twp(x)
-def _dict_twp(x):		return _list_twp(map(_list_twp, x.items()))
+def _tuple_ser(x):		return _list_ser(x)
+def _set_ser(x):		return _list_ser(x)
+def _frozenset_ser(x):		return _list_ser(x)
+def _dict_ser(x):		return _list_ser(map(_list_ser, x.items()))
 
-### Unthwompers
+### Deserializers
 
-def _bytes_unt(bobj):		return bobj
-def _str_unt(bobj):		return bytesToStr(bobj)
-def _int_unt(bobj):		return VLQToInt(bobj)
-def _bool_unt(bobj):		return False if bobj[0] == "\x00" else True
+def _bytes_des(bobj):		return bobj
+def _str_des(bobj):		return bytesToStr(bobj)
+def _int_des(bobj):		return VLQToInt(bobj)
+def _bool_des(bobj):		return False if bobj[0] == "\x00" else True
 
-def _list_unt(bobj):
+def _list_des(bobj):
 	x = []
 	while bobj != b"":
 		[y, bobj] = peel(bobj)
-		x.append(Unthwomp(y))
+		x.append(Des(y))
 	return x
 
-def _tuple_unt(bobj):		return tuple(_list_unt(bobj))
-def _set_unt(bobj):		return set(_list_unt(bobj))
-def _frozenset_unt(bobj):	return frozenset(_list_unt(bobj))
-def _dict_unt(bobj):		return dict(map(_list_unt, _list_unt(bobj)))
+def _tuple_des(bobj):		return tuple(_list_des(bobj))
+def _set_des(bobj):		return set(_list_des(bobj))
+def _frozenset_des(bobj):	return frozenset(_list_des(bobj))
+def _dict_des(bobj):		return dict(map(_list_des, _list_des(bobj)))
 
 ### Frontend Interface
 
 codecs = {
-	"bytes":	[_bytes_twp,		_bytes_unt],
-	"str":		[_str_twp,		_str_unt],
-	"int":		[_int_twp,		_int_unt],
-	"bool":		[_bool_twp,		_bool_unt],
-	"list":		[_list_twp,		_list_unt],
-	"tuple":	[_tuple_twp,		_tuple_unt],
-	"set":		[_set_twp,		_set_unt],
-	"frozenset":	[_frozenset_twp,	_frozenset_unt],
-	"dict":		[_dict_twp,		_dict_unt],
+	"bytes":	[_bytes_ser,		_bytes_des],
+	"str":		[_str_ser,		_str_des],
+	"int":		[_int_ser,		_int_des],
+	"bool":		[_bool_ser,		_bool_des],
+	"list":		[_list_ser,		_list_des],
+	"tuple":	[_tuple_ser,		_tuple_des],
+	"set":		[_set_ser,		_set_des],
+	"frozenset":	[_frozenset_ser,	_frozenset_des],
+	"dict":		[_dict_ser,		_dict_des],
 }
 
-def Thwomp(x):
+def Ser(x):
 	"""Serializes a python object into a bytes string."""
 	
 	try:
 		t = type(x).__name__
-		thwomper = codecs[t][0]
+		serializer = codecs[t][0]
 	except Exception:
 		raise Exception("Error: object of type '" + type(x).__name__ + "' couldn't be serialized...")
 	
-	return pascalify(strToBytes(t)) + pascalify(thwomper(x))
+	return pascalify(strToBytes(t)) + pascalify(serializer(x))
 
-def Unthwomp(bobj):
+def Des(bobj):
 	"""Deserializes a bytes string into a python object."""
 	
 	try:
 		[t, bobj] = peel(bobj)
-		unthwomper = codecs[bytesToStr(t)][1]
+		deserializer = codecs[bytesToStr(t)][1]
 	except Exception:
 		raise Exception("Error: object of type '" + t + "' couldn't be deserialized...")
-	return unthwomper(peel(bobj)[0]) # We don't use 'skipVLQ' since this function uses the length given, while skipVLQ does not
+	return deserializer(peel(bobj)[0]) # We don't use 'skipVLQ' since this function uses the length given, while skipVLQ does not
 
 ### Unit Tests
 
@@ -233,11 +233,11 @@ class testVLQ(testLooperMixin):
 		
 		self.loopTests(args, expecteds, skipVLQ)
 
-class testThwompers(testLooperMixin):
+class testSerializers(testLooperMixin):
 	def test_bytes(self):
 		arg = b"lwiherkjtghjfd"
 		expected = b"lwiherkjtghjfd"
-		result = _bytes_twp(arg)
+		result = _bytes_ser(arg)
 		self.assertEqual(result, expected)
 	
 	# def test_str(self): # Too simple to write a test for as of now (except maybe the part where it uses 'utf-8', which doesn't encode arbitrary strings)
@@ -246,9 +246,9 @@ class testThwompers(testLooperMixin):
 	
 	# def test_bool(self): # Too simple to write a test for as of now
 	
-	@patch(__name__ + ".Thwomp")
-	def test_list(self, notThwomp):
-		notThwomp.side_effect = [
+	@patch(__name__ + ".Ser")
+	def test_list(self, notSer):
+		notSer.side_effect = [
 			b"\x03int\x01\x05",
 			
 			b"\x03str\x03bee",
@@ -294,29 +294,29 @@ class testThwompers(testLooperMixin):
 		]
 		
 		extraAsserts = [
-			lambda: notThwomp.assert_has_calls([call(5)]),
-			lambda: notThwomp.assert_has_calls([call("bee")]),
-			lambda: notThwomp.assert_has_calls([call(["bee"])]),
-			lambda: notThwomp.assert_has_calls([call(5, "hi")]),
-			lambda: notThwomp.assert_has_calls([call(5, ["bee"], "hi")]),
+			lambda: notSer.assert_has_calls([call(5)]),
+			lambda: notSer.assert_has_calls([call("bee")]),
+			lambda: notSer.assert_has_calls([call(["bee"])]),
+			lambda: notSer.assert_has_calls([call(5, "hi")]),
+			lambda: notSer.assert_has_calls([call(5, ["bee"], "hi")]),
 		]
 		
-		self.loopTests(args, expecteds, _list_twp)
+		self.loopTests(args, expecteds, _list_ser)
 	
-	# def test_tuple(self): # Since '_tuple_twp' is just a call to '_list_twp', it is redundant
+	# def test_tuple(self): # Since '_tuple_ser' is just a call to '_list_ser', it is redundant
 	
-	# def test_set(self): # Since '_set_twp' is just a call to '_list_twp', it is redundant
+	# def test_set(self): # Since '_set_ser' is just a call to '_list_ser', it is redundant
 	
-	# def test_frozenset(self): # Since '_frozenset_twp' is just a call to '_list_twp', it is redundant
+	# def test_frozenset(self): # Since '_frozenset_ser' is just a call to '_list_ser', it is redundant
 	
-	# @patch(__name__ + "._list_twp")
+	# @patch(__name__ + "._list_ser")
 	# def test_dict(self, notListSer): # I could test this, but it's too simple for me to bother
 
-class testUnthwompers(testLooperMixin):
+class testDeserializers(testLooperMixin):
 	def test_bytes(self):
 		arg = b"lwiherkjtghjfd"
 		expected = b"lwiherkjtghjfd"
-		result = _bytes_unt(arg)
+		result = _bytes_des(arg)
 		self.assertEqual(result, expected)
 	
 	# def test_str(self): # Too simple to write a test for as of now (except maybe the part where it uses 'utf-8', which doesn't encode arbitrary strings)
@@ -325,9 +325,9 @@ class testUnthwompers(testLooperMixin):
 	
 	# def test_bool(self): # Too simple to write a test for as of now
 	
-	@patch(__name__ + ".Unthwomp")
-	def test_list(self, notUnthwomp):
-		notUnthwomp.side_effect = [
+	@patch(__name__ + ".Des")
+	def test_list(self, notDes):
+		notDes.side_effect = [
 			5,
 			"bee",
 			["bee"],
@@ -364,21 +364,21 @@ class testUnthwompers(testLooperMixin):
 		]
 		
 		extraAsserts = [
-			lambda: notUnthwomp.assert_has_calls([
+			lambda: notDes.assert_has_calls([
 				call(b"\x03int\x01\x05")
 			]),
-			lambda: notUnthwomp.assert_has_calls([
+			lambda: notDes.assert_has_calls([
 				call(b"\x03str\x03bee")
 			]),
-			lambda: notUnthwomp.assert_has_calls([
+			lambda: notDes.assert_has_calls([
 				call(b"\x04list\x09" + \
 					b"\x08\x03str\x03bee"),
 			]),
-			lambda: notUnthwomp.assert_has_calls([
+			lambda: notDes.assert_has_calls([
 				call(b"\x03int\x01\x05"),
 				call(b"\x03str\x02hi"),
 			]),
-			lambda: notUnthwomp.assert_has_calls([
+			lambda: notDes.assert_has_calls([
 				call(b"\x03int\x01\x05"),
 				call(b"\x04list\x09" + \
 					b"\x08\x03str\x03bee"),
@@ -386,15 +386,15 @@ class testUnthwompers(testLooperMixin):
 			]),
 		]
 		
-		self.loopTests(args, expecteds, _list_unt)
+		self.loopTests(args, expecteds, _list_des)
 	
-	# def test_tuple(self): # Since '_tuple_unt' is just a call to '_list_unt', it is redundant
+	# def test_tuple(self): # Since '_tuple_des' is just a call to '_list_des', it is redundant
 	
-	# def test_set(self): # Since '_set_unt' is just a call to '_list_unt', it is redundant
+	# def test_set(self): # Since '_set_des' is just a call to '_list_des', it is redundant
 	
-	# def test_frozenset(self): # Since '_frozenset_unt' is just a call to '_list_unt', it is redundant
+	# def test_frozenset(self): # Since '_frozenset_des' is just a call to '_list_des', it is redundant
 	
-	# @patch(__name__ + "._list_unt")
+	# @patch(__name__ + "._list_des")
 	# def test_dict(self, notListDes): # I could test this, but it's too simple for me to bother
 
 if __name__ == "__main__":

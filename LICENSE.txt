@@ -1,7 +1,7 @@
 Copyright (C) 2020 Stephen Fedele <32551324+strangeprogrammer@users.noreply.github.com>
 
-This program and all source files marked as belonging to this program are
-licensed under the terms of the GNU Lesser General Public License,
+This library (ToBeGreen) and all source files marked as belonging to this
+program are licensed under the terms of the GNU Lesser General Public License,
 version 3 or any later version, but with the following additional terms:
 
 	As per Section 7, Term 'c', Clauses 1 and 2 of the GNU General
