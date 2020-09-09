@@ -1,1 +1,1 @@
-from .SerDes import codecs, Ser, Des
+from .SerDes import serers, desers, Ser, Des

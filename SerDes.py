@@ -119,37 +119,48 @@ def _dict_des(bobj):		return dict(map(_list_des, _list_des(bobj)))
 
 ### Frontend Interface
 
-codecs = {
-	"bytes":	[_bytes_ser,		_bytes_des],
-	"str":		[_str_ser,		_str_des],
-	"int":		[_int_ser,		_int_des],
-	"bool":		[_bool_ser,		_bool_des],
-	"list":		[_list_ser,		_list_des],
-	"tuple":	[_tuple_ser,		_tuple_des],
-	"set":		[_set_ser,		_set_des],
-	"frozenset":	[_frozenset_ser,	_frozenset_des],
-	"dict":		[_dict_ser,		_dict_des],
+serers = {
+	bytes:		["bytes",	_bytes_ser],
+	str:		["str",		_str_ser],
+	int:		["int",		_int_ser],
+	bool:		["bool",	_bool_ser],
+	list:		["list",	_list_ser],
+	tuple:		["tuple",	_tuple_ser],
+	set:		["set",		_set_ser],
+	frozenset:	["frozenset",	_frozenset_ser],
+	dict:		["dict",	_dict_ser],
+}
+
+desers = {
+	"bytes":	_bytes_des,
+	"str":		_str_des,
+	"int":		_int_des,
+	"bool":		_bool_des,
+	"list":		_list_des,
+	"tuple":	_tuple_des,
+	"set":		_set_des,
+	"frozenset":	_frozenset_des,
+	"dict":		_dict_des,
 }
 
 def Ser(x):
 	"""Serializes a python object into a bytes string."""
 	
 	try:
-		t = type(x).__name__
-		serializer = codecs[t][0]
+		[name, serializer] = serers[type(x)]
 	except Exception:
-		raise Exception("Error: object of type '" + type(x).__name__ + "' couldn't be serialized...")
+		raise Exception("Error: object of type '" + name + "' couldn't be serialized...")
 	
-	return pascalify(strToBytes(t)) + pascalify(serializer(x))
+	return pascalify(strToBytes(name)) + pascalify(serializer(x))
 
 def Des(bobj):
 	"""Deserializes a bytes string into a python object."""
 	
 	try:
-		[t, bobj] = peel(bobj)
-		deserializer = codecs[bytesToStr(t)][1]
+		[name, bobj] = peel(bobj)
+		deserializer = desers[bytesToStr(name)]
 	except Exception:
-		raise Exception("Error: object of type '" + t + "' couldn't be deserialized...")
+		raise Exception("Error: object of type '" + name + "' couldn't be deserialized...")
 	return deserializer(peel(bobj)[0]) # We don't use 'skipVLQ' since this function uses the length given, while skipVLQ does not
 
 ### Unit Tests
