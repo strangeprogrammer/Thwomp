@@ -157,6 +157,14 @@ def _bool_ser(x):
 	"""Serialize a boolean."""
 	return b"\xFF" if x else b"\x00"
 
+def _float_ser(x):
+	"""Serialize a float."""
+	return strToBytes(x.hex())
+
+def _complex_ser(x):
+	"Serialize a complex."
+	return _float_ser(x.real) + b" " + _float_ser(x.imag)
+
 def _list_ser(x):
 	"""Serialize a list recursively."""
 	blob = b""
@@ -198,6 +206,18 @@ def _bool_des(blob):
 	"""Deserialize into a boolean."""
 	return False if blob[0] == "\x00" else True
 
+def _float_des(blob):
+	"""Deserialize into a float."""
+	return float.fromhex(bytesToStr(blob))
+
+def _complex_des(bobj):
+	"Deserialize into a complex."
+	delim = bobj.index(b" ")
+	return complex(
+		_float_des(bobj[ : delim]),
+		_float_des(bobj[delim + 1 : ])
+	)
+
 def _list_des(blob):
 	"""Deserialize into a list (recursively)."""
 	x = []
@@ -224,11 +244,14 @@ def _dict_des(blob):
 
 ### Frontend Interface
 
+#: Full list of serializers available to 'Ser'.
 serers = {
 	bytes:		["bytes",	_bytes_ser],
 	str:		["str",		_str_ser],
 	int:		["int",		_int_ser],
 	bool:		["bool",	_bool_ser],
+	float:		["float",	_float_ser],
+	complex:	["complex",	_complex_ser],
 	list:		["list",	_list_ser],
 	tuple:		["tuple",	_tuple_ser],
 	set:		["set",		_set_ser],
@@ -236,11 +259,14 @@ serers = {
 	dict:		["dict",	_dict_ser],
 }
 
+#: Full list of deserializers available to 'Des'.
 desers = {
 	"bytes":	_bytes_des,
 	"str":		_str_des,
 	"int":		_int_des,
 	"bool":		_bool_des,
+	"float":	_float_des,
+	"complex":	_complex_des,
 	"list":		_list_des,
 	"tuple":	_tuple_des,
 	"set":		_set_des,
@@ -362,6 +388,10 @@ class testSerializers(testLooperMixin):
 	
 	# def test_bool(self): # Too simple to write a test for as of now
 	
+	# def test_float(self): # Too simple to write a test for as of now
+	
+	# def test_complex(self): # Too simple to write a test for as of now
+	
 	@patch(__name__ + ".Ser")
 	def test_list(self, notSer):
 		notSer.side_effect = [
@@ -440,6 +470,10 @@ class testDeserializers(testLooperMixin):
 	# def test_int(self): # Unessecary since we've already tested 'intToVLQ' and 'VLQToInt' earlier
 	
 	# def test_bool(self): # Too simple to write a test for as of now
+	
+	# def test_float(self): # Too simple to write a test for as of now
+	
+	# def test_complex(self): # Too simple to write a test for as of now
 	
 	@patch(__name__ + ".Des")
 	def test_list(self, notDes):

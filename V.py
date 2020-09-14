@@ -176,7 +176,7 @@ class DICT(CUSTOM):
 ### Frontend Interface
 
 def Ver(obj, spec):
-	"""If the given type specification is VERIFYABLE, call the verification function with the given object. Otherise, verify that the object is of the given type directly."""
+	"""If the given type specification is of type VERIFYABLE, call the verification function of the given specification. Otherise, verify that the object is of the given type directly."""
 	if isinstance(spec, VERIFYABLE):
 		return spec.verify(obj)
 	else:
