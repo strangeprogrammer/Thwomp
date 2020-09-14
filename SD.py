@@ -1,6 +1,6 @@
 #!/bin/python3
 
-# ToBeGreen is a python3 library used for (de)serialization between python data objects and bytes strings.
+# ToBeGreen is a python3 library used for (de)serialization between python data objects and blobs.
 # Copyright (C) 2020 Stephen Fedele <32551324+strangeprogrammer@users.noreply.github.com>
 # 
 # This file is part of ToBeGreen.
@@ -24,19 +24,72 @@
 
 
 
+"""Serialization and deserialization tools."""
+
+__all__ = [
+	### Backend Interface
+	
+	"strToBytes",
+	"bytesToStr",
+	"intToVLQ",
+	"VLQToInt",
+	"skipVLQ",
+	"pascalify",
+	"depascalify",
+	"peel",
+	
+	### Serializers
+	
+	"_bytes_ser",
+	"_str_ser",
+	"_int_ser",
+	"_bool_ser",
+	"_list_ser",
+	"_tuple_ser",
+	"_set_ser",
+	"_frozenset_ser",
+	"_dict_ser",
+	
+	### Deserializers
+	
+	"_bytes_des",
+	"_str_des",
+	"_int_des",
+	"_bool_des",
+	"_list_des",
+	"_tuple_des",
+	"_set_des",
+	"_frozenset_des",
+	"_dict_des",
+	
+	### Frontend Interface
+	
+	"serers",
+	"desers",
+	"Ser",
+	"Des",
+]
+
 ### Notes:
 
-# VLQ is an acronym that basically means 'variable-length int'
-# More information on VLQ can be found at:
+# 'VLQ' is an acronym that basically means 'variable-length int'. VLQ's are used
+# during the serialization and deserialization process to describe the length of
+# the transmitted objects.
+# More information on VLQ's can be found at:
 # https://en.wikipedia.org/wiki/Variable-length_quantity
 
 ### Backend Interface
 
-def strToBytes(s):		return bytes(str(s), "utf-8")
-def bytesToStr(byteobj):	return str(bytes(byteobj), "utf-8")
+def strToBytes(s):
+	"""Converts a string into its blob equivalent."""
+	return bytes(str(s), "utf-8")
+
+def bytesToStr(byteobj):
+	"""Converts a blob into its string equivalent."""
+	return str(bytes(byteobj), "utf-8")
 
 def intToVLQ(n):
-	"""Takes an integer and returns a bytes object representing its VLQ equivalent."""
+	"""Takes an integer and returns a blob representing its VLQ equivalent."""
 	n = abs(int(n))
 	result = []
 	
@@ -50,72 +103,124 @@ def intToVLQ(n):
 	result[-1] &= 0b01111111
 	return bytes(result)
 
-def VLQToInt(bobj):
-	"""Takes a bytes object representing a VLQ and returns its integer equivalent."""
+def VLQToInt(blob):
+	"""Takes a blob representing a VLQ and returns its integer equivalent."""
 	n = 0
 	while True:
 		n <<= 7
-		[x, bobj] = [bobj[0], bobj[1:]]
+		[x, blob] = [blob[0], blob[1:]]
 		n += x & 0b01111111
 		
 		if not x & 0b10000000:
 			return n
 
-def skipVLQ(bobj):
-	"""Takes a bytes object and skips over its VLQ header."""
+def skipVLQ(blob):
+	"""Takes a blob and skips over its VLQ header."""
 	while True:
-		x = bobj[0]
+		x = blob[0]
 		if x & 0b10000000:
-			bobj = bobj[1:]
+			blob = blob[1:]
 		else:
-			return bobj[1:]
+			return blob[1:]
 
-def pascalify(bobj):		return intToVLQ(len(bobj)) + bobj
-def depascalify(bobj):		return [VLQToInt(bobj), skipVLQ(bobj)]
+def pascalify(blob):
+	"""Concatenate the length of a blob with the object itself, and return the result."""
+	return intToVLQ(len(blob)) + blob
 
-def peel(bobj):
-	[blength, bobj] = depascalify(bobj)
+def depascalify(blob):
+	"""Return the length of a blob along with EVERYTHING following said length field."""
+	return [VLQToInt(blob), skipVLQ(blob)]
+
+def peel(blob):
+	"""Deconcatenate and depascalify a blob, and return it along with EVERYTHING that's left over."""
+	[blength, blob] = depascalify(blob)
 	return [
-		bobj[ : blength], # What we expect to receive given 'blength'
-		bobj[blength : ], # What we didn't expect to receive
+		blob[ : blength], # What we expect to receive given 'blength'
+		blob[blength : ], # What we didn't expect to receive
 	]
 
 ### Serializers
 
-def _bytes_ser(x):		return bytes(x)
-def _str_ser(x):		return strToBytes(x)
-def _int_ser(x):		return intToVLQ(x)
-def _bool_ser(x):		return b"\xFF" if x else b"\x00"
+def _bytes_ser(x):
+	"""Serialize a blob."""
+	return bytes(x)
+
+def _str_ser(x):
+	"""Serialize a string."""
+	return strToBytes(x)
+
+def _int_ser(x):
+	"""Serialize an integer."""
+	return intToVLQ(x)
+
+def _bool_ser(x):
+	"""Serialize a boolean."""
+	return b"\xFF" if x else b"\x00"
 
 def _list_ser(x):
-	bobj = b""
+	"""Serialize a list recursively."""
+	blob = b""
 	for y in x:
-		bobj += pascalify(Ser(y))
-	return bobj
+		blob += pascalify(Ser(y))
+	return blob
 
-def _tuple_ser(x):		return _list_ser(x)
-def _set_ser(x):		return _list_ser(x)
-def _frozenset_ser(x):		return _list_ser(x)
-def _dict_ser(x):		return _list_ser(map(_list_ser, x.items()))
+def _tuple_ser(x):
+	"""Serialize a tuple recursively."""
+	return _list_ser(x)
+
+def _set_ser(x):
+	"""Serialize a set recursively."""
+	return _list_ser(x)
+
+def _frozenset_ser(x):
+	"""Serialize a frozenset recursively."""
+	return _list_ser(x)
+
+def _dict_ser(x):
+	"""Serialize a dict recursively."""
+	return _list_ser(map(_list_ser, x.items()))
 
 ### Deserializers
 
-def _bytes_des(bobj):		return bobj
-def _str_des(bobj):		return bytesToStr(bobj)
-def _int_des(bobj):		return VLQToInt(bobj)
-def _bool_des(bobj):		return False if bobj[0] == "\x00" else True
+def _bytes_des(blob):
+	"""Deserialize into a blob."""
+	return blob
 
-def _list_des(bobj):
+def _str_des(blob):
+	"""Deserialize into a string."""
+	return bytesToStr(blob)
+
+def _int_des(blob):
+	"""Deserialize into an integer."""
+	return VLQToInt(blob)
+
+def _bool_des(blob):
+	"""Deserialize into a boolean."""
+	return False if blob[0] == "\x00" else True
+
+def _list_des(blob):
+	"""Deserialize into a list (recursively)."""
 	x = []
-	while bobj != b"":
-		[y, bobj] = peel(bobj)
+	while blob != b"":
+		[y, blob] = peel(blob)
 		x.append(Des(y))
 	return x
 
-def _tuple_des(bobj):		return tuple(_list_des(bobj))
-def _set_des(bobj):		return set(_list_des(bobj))
-def _frozenset_des(bobj):	return frozenset(_list_des(bobj))
-def _dict_des(bobj):		return dict(map(_list_des, _list_des(bobj)))
+def _tuple_des(blob):
+	"""Deserialize into a tuple."""
+	return tuple(_list_des(blob))
+
+def _set_des(blob):
+	"""Deserialize into a set."""
+	return set(_list_des(blob))
+
+def _frozenset_des(blob):
+	"""Deserialize into a frozenset."""
+	return frozenset(_list_des(blob))
+
+def _dict_des(blob):
+	"""Deserialize into a dict."""
+	return dict(map(_list_des, _list_des(blob)))
 
 ### Frontend Interface
 
@@ -144,7 +249,7 @@ desers = {
 }
 
 def Ser(x):
-	"""Serializes a python object into a bytes string."""
+	"""Serializes a python object into a blob."""
 	
 	try:
 		[name, serializer] = serers[type(x)]
@@ -153,15 +258,15 @@ def Ser(x):
 	
 	return pascalify(strToBytes(name)) + pascalify(serializer(x))
 
-def Des(bobj):
-	"""Deserializes a bytes string into a python object."""
+def Des(blob):
+	"""Deserializes a blob into a python object."""
 	
 	try:
-		[name, bobj] = peel(bobj)
+		[name, blob] = peel(blob)
 		deserializer = desers[bytesToStr(name)]
 	except Exception:
 		raise Exception("Error: object of type '" + name + "' couldn't be deserialized...")
-	return deserializer(peel(bobj)[0]) # We don't use 'skipVLQ' since this function uses the length given, while skipVLQ does not
+	return deserializer(peel(blob)[0]) # We don't use 'skipVLQ' since it doesn't use the length given, while 'peel' does
 
 ### Unit Tests
 
