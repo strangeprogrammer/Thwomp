@@ -1,6 +1,6 @@
 #!/bin/python3
 
-# ToBeGreen is a python3 library used for (de)serialization between python data objects and bytes strings.
+# ToBeGreen is a python3 library used for (de)serialization between python data objects and blobs.
 # Copyright (C) 2020 Stephen Fedele <32551324+strangeprogrammer@users.noreply.github.com>
 # 
 # This file is part of ToBeGreen.
@@ -24,8 +24,32 @@
 
 
 
+"""Verification tools."""
+
 import abc
 import itertools
+
+__all__ = [
+	### Backend Interface
+	
+	"VERIFYABLE",
+	"CUSTOM",
+	
+	### Pre-Made Specifications
+	
+	"SUM",
+	"PRODUCT",
+	"ITERABLE",
+	"LIST",
+	"TUPLE",
+	"SET",
+	"FROZENSET",
+	"DICT",
+	
+	### Frontend Interface
+	
+	"Ver",
+]
 
 ### Notes
 
@@ -52,13 +76,13 @@ import itertools
 ### Backend Interface
 
 class VERIFYABLE(abc.ABC):
+	"""Abstract class indicating that child classes have the method 'verify'."""
 	@abc.abstractmethod
 	def verify(self, obj):
 		return True
 
-### Specifications
-
 class CUSTOM(VERIFYABLE, abc.ABC):
+	"""Abstract class that can be used to verify that an object is of a specific type."""
 	def __init__(self, tipo, *args, **kwargs):
 		[
 			self.tipo,
@@ -77,7 +101,10 @@ class CUSTOM(VERIFYABLE, abc.ABC):
 		
 		return super().verify(obj)
 
+### Pre-Made Specifications
+
 class SUM(VERIFYABLE):
+	"""Class that checks that a given object is of ANY of the types given during initialization."""
 	def __init__(self, *args):
 		self.args = args
 	
@@ -88,6 +115,7 @@ class SUM(VERIFYABLE):
 		))
 
 class PRODUCT(VERIFYABLE):
+	"""Class that checks that a given iterable's elements have the SAME TYPE SIGNATURE as that given during initialization."""
 	def __init__(self, *args):
 		self.args = args
 		self.length = len(args)
@@ -102,6 +130,7 @@ class PRODUCT(VERIFYABLE):
 		))
 
 class ITERABLE(CUSTOM):
+	"""Class that checks that a given iterable's elements ALL belong to a type given during initialization."""
 	def __init__(self, tipo, subtipo, *args, **kwargs):
 		self.subtipo = subtipo
 		super().__init__(tipo, *args, **kwargs)
@@ -113,22 +142,27 @@ class ITERABLE(CUSTOM):
 		))
 
 class LIST(ITERABLE):
+	"""Checks that the given iterable is a list containing elements of a type specified during initialization."""
 	def __init__(self, *args, **kwargs):
 		super().__init__(list, *args, **kwargs)
 
 class TUPLE(ITERABLE):
+	"""Checks that the given iterable is a tuple containing elements of a type specified during initialization."""
 	def __init__(self, *args, **kwargs):
 		super().__init__(tuple, *args, **kwargs)
 
 class SET(ITERABLE):
+	"""Checks that the given iterable is a set containing elements of a type specified during initialization."""
 	def __init__(self, *args, **kwargs):
 		super().__init__(set, *args, **kwargs)
 
 class FROZENSET(ITERABLE):
+	"""Checks that the given iterable is a frozenset containing elements of a type specified during initialization."""
 	def __init__(self, *args, **kwargs):
 		super().__init__(frozenset, *args, **kwargs)
 
 class DICT(CUSTOM):
+	"""Checks that each (key, value) pair within the given dictionary is of a type specified during initialization."""
 	def __init__(self, KVtipo, *args, **kwargs):
 		self.KVtipo = KVtipo
 		super().__init__(dict, *args, **kwargs)
@@ -142,6 +176,7 @@ class DICT(CUSTOM):
 ### Frontend Interface
 
 def Ver(obj, spec):
+	"""If the given type specification is VERIFYABLE, call the verification function with the given object. Otherise, verify that the object is of the given type directly."""
 	if isinstance(spec, VERIFYABLE):
 		return spec.verify(obj)
 	else:
