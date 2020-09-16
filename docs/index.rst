@@ -11,6 +11,7 @@ Welcome to ToBeGreen's documentation!
 	:caption: Contents:
 	
 	(De)Serialization <SD>
+	Verification <V>
 
 ==================
 Indices and tables

@@ -56,11 +56,10 @@ Frontend Interface
 .. autofunction:: Ser
 .. autofunction:: Des
 
-========
 Examples
 ========
 
-The following example code shows how to use the builtin functions 'Ser' and
+The following example code shows how to use the primary functions 'Ser' and
 'Des'::
 	
 	from ToBeGreen import Ser, Des

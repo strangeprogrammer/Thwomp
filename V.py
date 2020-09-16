@@ -524,29 +524,3 @@ class testSpecifications(testLooperMixin, checkCallsMixin):
 
 if __name__ == "__main__":
 	unittest.main()
-
-#def example_func(pipe):
-#	
-#	response = Des(pipe.recv_bytes())
-#	spec = TBG.LIST(
-#		TBG.DICT(
-#			TBG.SUM(
-#				TBG.PRODUCT(
-#					frozenset,
-#					int,
-#				),
-#				TBG.PRODUCT(
-#					str,
-#					complex,
-#				),
-#			)
-#			length = 1,
-#		),
-#		minlength = 5,
-#		maxlength = 10
-#	)
-#	
-#	if Ver(response, spec):
-#		pass
-#	else:
-#		pass
