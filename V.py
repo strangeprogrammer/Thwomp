@@ -28,6 +28,7 @@
 
 import abc
 import itertools
+import math
 
 __all__ = [
 	### Backend Interface
@@ -81,18 +82,27 @@ class VERIFYABLE(abc.ABC):
 	def verify(self, obj):
 		return True
 
+class OFLENGTH(VERIFYABLE, abc.ABC): # TODO: Add tests for this class
+	"""Abstract class that can be used to verify that an object has a certain length."""
+	def __init__(self, *args, minlength = None, maxlength = None, length = None, **kwargs):
+		self.minlength = length or minlength or 0
+		self.maxlength = length or maxlength or math.inf
+		if length is not None:
+			self.maxlength += 1
+		super().__init__(*args, **kwargs)
+	
+	@abc.abstractmethod
+	def verify(self, obj):
+		if self.minlength <= len(obj) < self.maxlength: # C-style boundaries
+			return super().verify(obj)
+		else:
+			return False
+
 class CUSTOM(VERIFYABLE, abc.ABC):
 	"""Abstract class that can be used to verify that an object is of a specific type."""
 	def __init__(self, tipo, *args, **kwargs):
-		[
-			self.tipo,
-			self.args,
-			self.kwargs,
-		] = [
-			tipo,
-			args,
-			kwargs,
-		]
+		self.tipo = tipo
+		super().__init__(*args, **kwargs)
 	
 	@abc.abstractmethod
 	def verify(self, obj):
@@ -129,7 +139,7 @@ class PRODUCT(VERIFYABLE):
 			objs, self.args
 		))
 
-class ITERABLE(CUSTOM):
+class ITERABLE(CUSTOM, OFLENGTH):
 	"""Class that checks that a given iterable's elements ALL belong to a type given during initialization."""
 	def __init__(self, tipo, subtipo, *args, **kwargs):
 		self.subtipo = subtipo
@@ -161,7 +171,7 @@ class FROZENSET(ITERABLE):
 	def __init__(self, *args, **kwargs):
 		super().__init__(frozenset, *args, **kwargs)
 
-class DICT(CUSTOM):
+class DICT(CUSTOM, OFLENGTH):
 	"""Checks that each (key, value) pair within the given dictionary is of a type specified during initialization."""
 	def __init__(self, KVtipo, *args, **kwargs):
 		self.KVtipo = KVtipo
@@ -243,7 +253,7 @@ class testLooperMixin(unittest.TestCase):
 		expecteds,
 		f,
 		befores = itertools.repeat(lambda: None),
-		afters = itertools.repeat(lambda: None)
+		afters = itertools.repeat(lambda: None),
 	):
 		for [i, [arg, expected, before, after]] in enumerate(zip(args, expecteds, befores, afters)):
 			with self.subTest(i = i):
@@ -253,6 +263,45 @@ class testLooperMixin(unittest.TestCase):
 				after()
 
 class testSpecifications(testLooperMixin, checkCallsMixin):
+	def test_OFLENGTH(self):
+		class CONCRETE(OFLENGTH):
+			def verify(self, obj): return super().verify(obj)
+		
+		args = [
+			[{},
+				[]],
+			[{},
+				(4, 2, 9, "hd", 33.3)],
+			[{"minlength": 2},
+				{2}],
+			[{"minlength": 2},
+				frozenset({4, 5})],
+			[{"maxlength": 2},
+				["beep"]],
+			[{"maxlength": 2},
+				["beep", "jeep"]],
+			[{"length": 2},
+				{"key1": "nope"}],
+			[{"length": 2},
+				["yes", "sir"]],
+			[{"length": 2},
+				["not", "a", "chance"]],
+		]
+		
+		expecteds = [
+			True,
+			True,
+			False,
+			True,
+			True,
+			False,
+			False,
+			True,
+			False,
+		]
+		
+		self.loopTests(args, expecteds, lambda t: CONCRETE(**t[0]).verify(t[1]))
+	
 	def test_SUM(self):
 		args = [
 			[[], 8],
