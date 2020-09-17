@@ -1,3 +1,3 @@
 #!/bin/bash
 
-cp -rf ./hooks ./.git/
+ln -srfT ./hooks/pre-commit ./.git/hooks/pre-commit
