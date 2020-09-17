@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+./SD.py
+./V.py
+make -C ./docs/ html

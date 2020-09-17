@@ -10,6 +10,10 @@ ToBeGreen is a python3 library used for (de)serialization between python data ob
 
 This library used to be named 'Thwomp'. It is now named 'ToBeGreen' based upon a terrible pun in Spanish: the primary functions that this library provides are 'Ser', 'Ver', and 'Des' (for serialize, verify, and deserialize, respectively). Together, this would form the Spanish phrase 'Ser Verdes' (to be green).
 
+### Installation
+
+After cloning this repository, run './install-hooks.sh' from the project root directory in order to install some git hooks that are useful for project development.
+
 ### Copyright Information
 
 See the file 'LICENSE.txt' for details.
