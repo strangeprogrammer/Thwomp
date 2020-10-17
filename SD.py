@@ -88,9 +88,8 @@ def bytesToStr(byteobj):
 	"""Converts a blob into its string equivalent."""
 	return str(bytes(byteobj), "utf-8")
 
-def intToVLQ(n):
+def intToVLQ(n): # We assume that 'n' is non-negative integer for speed purposes
 	"""Takes an integer and returns a blob representing its VLQ equivalent."""
-	n = abs(int(n))
 	result = []
 	
 	while True:
@@ -111,7 +110,7 @@ def VLQToInt(blob):
 		[x, blob] = [blob[0], blob[1:]]
 		n += x & 0b01111111
 		
-		if not x & 0b10000000:
+		if not (x & 0b10000000):
 			return n
 
 def skipVLQ(blob):
@@ -280,7 +279,7 @@ def Ser(x):
 	try:
 		[name, serializer] = serers[type(x)]
 	except Exception:
-		raise Exception("Error: object of type '" + name + "' couldn't be serialized...")
+		raise Exception("Error: object '" + str(x) + "' couldn't be serialized...")
 	
 	return pascalify(strToBytes(name)) + pascalify(serializer(x))
 
@@ -291,7 +290,8 @@ def Des(blob):
 		[name, blob] = peel(blob)
 		deserializer = desers[bytesToStr(name)]
 	except Exception:
-		raise Exception("Error: object of type '" + name + "' couldn't be deserialized...")
+		raise Exception("Error: object '" + str(blob) + "' couldn't be deserialized...")
+	
 	return deserializer(peel(blob)[0]) # We don't use 'skipVLQ' since it doesn't use the length given, while 'peel' does
 
 ### Unit Tests

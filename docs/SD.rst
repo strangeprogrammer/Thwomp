@@ -81,7 +81,7 @@ The following example code shows how to use the primary functions 'Ser' and
 		)
 	}
 	
-	y = Des(Ser(x)) = It is actually this simple.
+	y = Des(Ser(x)) # It is actually this simple.
 	
 	assert x == y, "This should never print."
 
