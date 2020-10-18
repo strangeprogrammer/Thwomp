@@ -88,8 +88,8 @@ def bytesToStr(byteobj):
 	"""Converts a blob into its string equivalent."""
 	return str(bytes(byteobj), "utf-8")
 
-def intToVLQ(n): # We assume that 'n' is non-negative integer for speed purposes
-	"""Takes an integer and returns a blob representing its VLQ equivalent."""
+def _intToVLQ(n): # Assumes that the input is non-negative for simplicity
+	"""Internal, non-memoized function."""
 	result = []
 	
 	while True:
@@ -101,6 +101,23 @@ def intToVLQ(n): # We assume that 'n' is non-negative integer for speed purposes
 	
 	result[-1] &= 0b01111111
 	return bytes(result)
+
+def scopingwrapper():
+	memoset = {}
+	
+	def intToVLQ(n): # Assumes that the input is non-negative for simplicity
+		"""Takes an integer and returns a blob representing its VLQ equivalent."""
+		
+		if n < 1024:
+			if not n in memoset:
+				memoset[n] = _intToVLQ(n)
+			return memoset[n]
+		else:
+			return _intToVLQ(n)
+	
+	return intToVLQ
+
+intToVLQ = scopingwrapper()
 
 def VLQToInt(blob):
 	"""Takes a blob representing a VLQ and returns its integer equivalent."""
