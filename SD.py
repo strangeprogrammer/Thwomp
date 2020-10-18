@@ -42,8 +42,8 @@ __all__ = [
 	
 	"_bytes_ser",
 	"_str_ser",
-	"_int_ser",
 	"_bool_ser",
+	"_int_ser",
 	"_list_ser",
 	"_tuple_ser",
 	"_set_ser",
@@ -54,8 +54,8 @@ __all__ = [
 	
 	"_bytes_des",
 	"_str_des",
-	"_int_des",
 	"_bool_des",
+	"_int_des",
 	"_list_des",
 	"_tuple_des",
 	"_set_des",
@@ -104,6 +104,7 @@ def intToVLQ(n): # We assume that 'n' is non-negative integer for speed purposes
 
 def VLQToInt(blob):
 	"""Takes a blob representing a VLQ and returns its integer equivalent."""
+	
 	n = 0
 	while True:
 		n <<= 7
@@ -148,13 +149,13 @@ def _str_ser(x):
 	"""Serialize a string."""
 	return strToBytes(x)
 
-def _int_ser(x):
-	"""Serialize an integer."""
-	return intToVLQ(x)
-
 def _bool_ser(x):
 	"""Serialize a boolean."""
 	return b"\xFF" if x else b"\x00"
+
+def _int_ser(x):
+	"""Serialize an integer."""
+	return _bool_ser(0 <= x) + intToVLQ(abs(x))
 
 def _float_ser(x):
 	"""Serialize a float."""
@@ -197,13 +198,17 @@ def _str_des(blob):
 	"""Deserialize into a string."""
 	return bytesToStr(blob)
 
-def _int_des(blob):
-	"""Deserialize into an integer."""
-	return VLQToInt(blob)
-
 def _bool_des(blob):
 	"""Deserialize into a boolean."""
-	return False if blob[0] == "\x00" else True
+	return False if blob == b"\x00" else True
+
+def _int_des(blob):
+	"""Deserialize into an integer."""
+	pospart = blob[1:]
+	if _bool_des(blob[0:1]):
+		return VLQToInt(pospart)
+	else:
+		return -VLQToInt(pospart)
 
 def _float_des(blob):
 	"""Deserialize into a float."""
@@ -247,8 +252,8 @@ def _dict_des(blob):
 serers = {
 	bytes:		["bytes",	_bytes_ser],
 	str:		["str",		_str_ser],
-	int:		["int",		_int_ser],
 	bool:		["bool",	_bool_ser],
+	int:		["int",		_int_ser],
 	float:		["float",	_float_ser],
 	complex:	["complex",	_complex_ser],
 	list:		["list",	_list_ser],
@@ -262,8 +267,8 @@ serers = {
 desers = {
 	"bytes":	_bytes_des,
 	"str":		_str_des,
-	"int":		_int_des,
 	"bool":		_bool_des,
+	"int":		_int_des,
 	"float":	_float_des,
 	"complex":	_complex_des,
 	"list":		_list_des,
@@ -395,17 +400,17 @@ class testSerializers(testLooperMixin):
 	@patch(__name__ + ".Ser")
 	def test_list(self, notSer):
 		notSer.side_effect = [
-			b"\x03int\x01\x05",
+			b"\x03int\x02\xFF\x05",
 			
 			b"\x03str\x03bee",
 			
 			b"\x04list\x09" + \
 				b"\x08\x03str\x03bee",
 				
-			b"\x03int\x01\x05",
+			b"\x03int\x02\xFF\x05",
 			b"\x03str\x02hi",
 			
-			b"\x03int\x01\x05",
+			b"\x03int\x02\xFF\x05",
 			b"\x04list\x09" + \
 				b"\x08\x03str\x03bee",
 			b"\x03str\x02hi",
@@ -423,17 +428,17 @@ class testSerializers(testLooperMixin):
 		expecteds = [
 			b"",
 			
-			b"\x06\x03int\x01\x05",
+			b"\x07\x03int\x02\xFF\x05",
 			
 			b"\x08\x03str\x03bee",
 			
 			b"\x0F\x04list\x09" + \
 				b"\x08\x03str\x03bee",
 			
-			b"\x06\x03int\x01\x05" + \
+			b"\x07\x03int\x02\xFF\x05" + \
 			b"\x07\x03str\x02hi",
 			
-			b"\x06\x03int\x01\x05" + \
+			b"\x07\x03int\x02\xFF\x05" + \
 			b"\x0F\x04list\x09" + \
 				b"\x08\x03str\x03bee" + \
 			b"\x07\x03str\x02hi",
@@ -488,17 +493,17 @@ class testDeserializers(testLooperMixin):
 		args = [
 			b"",
 			
-			b"\x06\x03int\x01\x05",
+			b"\x07\x03int\x02\xFF\x05",
 			
 			b"\x08\x03str\x03bee",
 			
 			b"\x0F\x04list\x09" + \
 				b"\x08\x03str\x03bee",
 			
-			b"\x06\x03int\x01\x05" + \
+			b"\x07\x03int\x02\xFF\x05" + \
 			b"\x07\x03str\x02hi",
 			
-			b"\x06\x03int\x01\x05" + \
+			b"\x07\x03int\x02\xFF\x05" + \
 			b"\x0F\x04list\x09" + \
 				b"\x08\x03str\x03bee" + \
 			b"\x07\x03str\x02hi",
@@ -515,7 +520,7 @@ class testDeserializers(testLooperMixin):
 		
 		extraAsserts = [
 			lambda: notDes.assert_has_calls([
-				call(b"\x03int\x01\x05")
+				call(b"\x03int\x02\xFF\x05")
 			]),
 			lambda: notDes.assert_has_calls([
 				call(b"\x03str\x03bee")
@@ -525,11 +530,11 @@ class testDeserializers(testLooperMixin):
 					b"\x08\x03str\x03bee"),
 			]),
 			lambda: notDes.assert_has_calls([
-				call(b"\x03int\x01\x05"),
+				call(b"\x03int\x02\xFF\x05"),
 				call(b"\x03str\x02hi"),
 			]),
 			lambda: notDes.assert_has_calls([
-				call(b"\x03int\x01\x05"),
+				call(b"\x03int\x02\xFF\x05"),
 				call(b"\x04list\x09" + \
 					b"\x08\x03str\x03bee"),
 				call(b"\x03str\x02hi"),
