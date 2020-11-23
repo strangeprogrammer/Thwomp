@@ -1,1 +1,15 @@
+# Ignore build products
+
+/build/
+/dist/
+/ToBeGreen.egg-info/
+
+# Ignore virtual environments
+
+/lib/
+/bin/
+/pyvenv.cfg
+
+# Ignore python caching globally
+
 __pycache__/

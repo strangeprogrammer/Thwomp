@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -e
+
+YELLOW="\e[33m"
+NORMAL="\e[39m"
+
+echo -en $YELLOW
+echo "DON'T FORGET:"
+echo "Fix up the 'release' number in './docs/conf.py' and 'git tag' if a new version's out."
+echo -en $NORMAL

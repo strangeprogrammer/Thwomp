@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/env python3
 
 # ToBeGreen is a python3 library used for (de)serialization between python data objects and blobs.
 # Copyright (C) 2020 Stephen Fedele <32551324+strangeprogrammer@users.noreply.github.com>
@@ -26,14 +26,35 @@
 
 """Serialization and deserialization tools."""
 
+# 'Sphinx' will complain a lot if 'MiniCLEB' isn't installed on the system
+# (virtualenv's don't count, unfortunately), so we create a dummy library
+# instead to assuage its wrath.
+try:
+	import MiniCLEB as LEB
+except Exception as e:
+	class DepNotFoundException(Exception):
+		"Raised when the a dependency hasn't been found for import (it's probably not installed)."
+		
+		def __init__(self, dep, *args):
+			super().__init__("Dependency '" + str(dep) + "' not found (is it in installed in your virtualenv)?")
+	
+	def DocOnly(depname):
+		class wrapper:
+			"""This class should only ever be used by 'Sphinx' internally."""
+			
+			def __getattribute__(self, name):
+				raise DepNotFoundException(depname)
+		
+		return wrapper()
+	
+	LEB = DocOnly("MiniCLEB")
+
 __all__ = [
 	### Backend Interface
 	
 	"strToBytes",
 	"bytesToStr",
-	"intToVLQ",
-	"VLQToInt",
-	"skipVLQ",
+	"ObeseMessageException",
 	"pascalify",
 	"depascalify",
 	"peel",
@@ -70,14 +91,6 @@ __all__ = [
 	"Des",
 ]
 
-### Notes:
-
-# 'VLQ' is an acronym that basically means 'variable-length int'. VLQ's are used
-# during the serialization and deserialization process to describe the length of
-# the transmitted objects.
-# More information on VLQ's can be found at:
-# https://en.wikipedia.org/wiki/Variable-length_quantity
-
 ### Backend Interface
 
 def strToBytes(s):
@@ -88,65 +101,24 @@ def bytesToStr(byteobj):
 	"""Converts a blob into its string equivalent."""
 	return str(bytes(byteobj), "utf-8")
 
-def _intToVLQ(n): # Assumes that the input is non-negative for simplicity
-	"""Internal, non-memoized function."""
-	result = []
-	
-	while True:
-		result = [n & 0b01111111 | 0b10000000] + result
-		n >>= 7
-		
-		if not 0 < n:
-			break
-	
-	result[-1] &= 0b01111111
-	return bytes(result)
+# Wrappers for 'MiniCLEB'
 
-def scopingwrapper():
-	memoset = {}
+class ObeseMessageException(Exception):
+	"Raised by 'depascalify' when the message is too large to put into RAM (or is malformed as such)."
 	
-	def intToVLQ(n): # Assumes that the input is non-negative for simplicity
-		"""Takes an integer and returns a blob representing its VLQ equivalent."""
-		
-		if n < 1024:
-			if not n in memoset:
-				memoset[n] = _intToVLQ(n)
-			return memoset[n]
-		else:
-			return _intToVLQ(n)
-	
-	return intToVLQ
-
-intToVLQ = scopingwrapper()
-
-def VLQToInt(blob):
-	"""Takes a blob representing a VLQ and returns its integer equivalent."""
-	
-	n = 0
-	while True:
-		n <<= 7
-		[x, blob] = [blob[0], blob[1:]]
-		n += x & 0b01111111
-		
-		if not (x & 0b10000000):
-			return n
-
-def skipVLQ(blob):
-	"""Takes a blob and skips over its VLQ header."""
-	while True:
-		x = blob[0]
-		if x & 0b10000000:
-			blob = blob[1:]
-		else:
-			return blob[1:]
+	def __init__(self, *args):
+		super().__init__("The message was too large to put into RAM (or is malformed as such).")
 
 def pascalify(blob):
 	"""Concatenate the length of a blob with the object itself, and return the result."""
-	return intToVLQ(len(blob)) + blob
+	return LEB.fromInt(len(blob)) + blob
 
 def depascalify(blob):
 	"""Return the length of a blob along with EVERYTHING following said length field."""
-	return [VLQToInt(blob), skipVLQ(blob)]
+	[leb, blob] = LEB.extract(blob)
+	if not LEB.valid(leb):
+		raise ObeseMessageException()
+	return [LEB.toInt(leb), blob]
 
 def peel(blob):
 	"""Deconcatenate and depascalify a blob, and return it along with EVERYTHING that's left over."""
@@ -172,7 +144,7 @@ def _bool_ser(x):
 
 def _int_ser(x):
 	"""Serialize an integer."""
-	return _bool_ser(0 <= x) + intToVLQ(abs(x))
+	return _bool_ser(0 <= x) + LEB.fromInt(abs(x))
 
 def _float_ser(x):
 	"""Serialize a float."""
@@ -223,9 +195,9 @@ def _int_des(blob):
 	"""Deserialize into an integer."""
 	pospart = blob[1:]
 	if _bool_des(blob[0:1]):
-		return VLQToInt(pospart)
+		return LEB.toInt(pospart)
 	else:
-		return -VLQToInt(pospart)
+		return -LEB.toInt(pospart)
 
 def _float_des(blob):
 	"""Deserialize into a float."""
@@ -314,7 +286,7 @@ def Des(blob):
 	except Exception:
 		raise Exception("Error: object '" + str(blob) + "' couldn't be deserialized...")
 	
-	return deserializer(peel(blob)[0]) # We don't use 'skipVLQ' since it doesn't use the length given, while 'peel' does
+	return deserializer(peel(blob)[0])
 
 ### Unit Tests
 
@@ -333,241 +305,188 @@ class testLooperMixin(unittest.TestCase):
 				self.assertEqual(result, expected)
 				extraAssert()
 
-class testVLQ(testLooperMixin):
-	def test_intToVLQ(self):
-		args = [
-			0,
-			55,
-			127,
-			128,
-			129,
-			246537,
-		]
+def __scopewrapper():
+	# Local declarations to make life easier
+	
+	obj5 = b"\xFF" + LEB.fromInt(5)
+	obj5 = LEB.fromInt(3) + b"int" + LEB.fromInt(len(obj5)) + obj5
+	
+	objbee = LEB.fromInt(3) + b"str" + LEB.fromInt(3) + b"bee"
+	objbeeser = LEB.fromInt(len(objbee)) + objbee
+	
+	objlist = LEB.fromInt(4) + b"list" + LEB.fromInt(len(objbeeser)) + objbeeser
+	
+	objhi = LEB.fromInt(3) + b"str" + LEB.fromInt(2) + b"hi"
+	objhiser = LEB.fromInt(len(objhi)) + objhi
+	
+	# Testing classes
+	
+	class testSerializers(testLooperMixin):
+		def test_bytes(self):
+			arg = b"lwiherkjtghjfd"
+			expected = b"lwiherkjtghjfd"
+			result = _bytes_ser(arg)
+			self.assertEqual(result, expected)
 		
-		expecteds = [
-			b"\x00",
-			b"\x37",
-			b"\x7F",
-			b"\x81\x00",
-			b"\x81\x01",
-			b"\x8F\x86\x09",
-		]
+		# def test_str(self): # Too simple to write a test for as of now (except maybe the part where it uses 'utf-8', which doesn't encode arbitrary strings)
 		
-		self.loopTests(args, expecteds, intToVLQ)
-	
-	def test_VLQToInt(self):
-		args = [
-			b"\x00garbage0",
-			b"\x37garbage1",
-			b"\x7Fgarbage2",
-			b"\x81\x00garbage3",
-			b"\x81\x01garbage4",
-			b"\x8F\x86\x09garbage5",
-		]
+		# def test_int(self): # Too simple to write a test for as of now
 		
-		expecteds = [
-			0,
-			55,
-			127,
-			128,
-			129,
-			246537,
-		]
+		# def test_bool(self): # Too simple to write a test for as of now
 		
-		self.loopTests(args, expecteds, VLQToInt)
-	
-	def test_skipVLQ(self):
-		args = [
-			b"\x00garbage0",
-			b"\x37garbage1",
-			b"\x7Fgarbage2",
-			b"\x81\x00garbage3",
-			b"\x81\x01garbage4",
-			b"\x8F\x86\x09garbage5",
-		]
+		# def test_float(self): # Too simple to write a test for as of now
 		
-		expecteds = [
-			b"garbage0",
-			b"garbage1",
-			b"garbage2",
-			b"garbage3",
-			b"garbage4",
-			b"garbage5",
-		]
+		# def test_complex(self): # Too simple to write a test for as of now
 		
-		self.loopTests(args, expecteds, skipVLQ)
-
-class testSerializers(testLooperMixin):
-	def test_bytes(self):
-		arg = b"lwiherkjtghjfd"
-		expected = b"lwiherkjtghjfd"
-		result = _bytes_ser(arg)
-		self.assertEqual(result, expected)
-	
-	# def test_str(self): # Too simple to write a test for as of now (except maybe the part where it uses 'utf-8', which doesn't encode arbitrary strings)
-	
-	# def test_int(self): # Unessecary since we've already tested 'intToVLQ' and 'VLQToInt' earlier
-	
-	# def test_bool(self): # Too simple to write a test for as of now
-	
-	# def test_float(self): # Too simple to write a test for as of now
-	
-	# def test_complex(self): # Too simple to write a test for as of now
-	
-	@patch(__name__ + ".Ser")
-	def test_list(self, notSer):
-		notSer.side_effect = [
-			b"\x03int\x02\xFF\x05",
-			
-			b"\x03str\x03bee",
-			
-			b"\x04list\x09" + \
-				b"\x08\x03str\x03bee",
+		@patch(__name__ + ".Ser")
+		def test_list(self, notSer):
+			notSer.side_effect = [
+				obj5,
 				
-			b"\x03int\x02\xFF\x05",
-			b"\x03str\x02hi",
+				objbee,
+				
+				objlist,
+				
+				obj5,
+				objhi,
+				
+				obj5,
+				objlist,
+				objhi,
+			]
 			
-			b"\x03int\x02\xFF\x05",
-			b"\x04list\x09" + \
-				b"\x08\x03str\x03bee",
-			b"\x03str\x02hi",
-		]
+			args = [
+				[],
+				[5],
+				["bee"],
+				[["bee"]],
+				[5, "hi"],
+				[5, ["bee"], "hi"],
+			]
+			
+			expecteds = [
+				b"",
+				
+				LEB.fromInt(len(obj5)) + obj5,
+				
+				LEB.fromInt(len(objbee)) + objbee,
+				
+				LEB.fromInt(len(objlist)) + objlist,
+				
+				LEB.fromInt(len(obj5)) + obj5 + \
+				LEB.fromInt(len(objhi)) + objhi,
+				
+				LEB.fromInt(len(obj5)) + obj5 + \
+				LEB.fromInt(len(objlist)) + objlist + \
+				LEB.fromInt(len(objhi)) + objhi,
+			]
+			
+			extraAsserts = [
+				lambda: notSer.assert_has_calls([call(5)]),
+				lambda: notSer.assert_has_calls([call("bee")]),
+				lambda: notSer.assert_has_calls([call(["bee"])]),
+				lambda: notSer.assert_has_calls([call(5, "hi")]),
+				lambda: notSer.assert_has_calls([call(5, ["bee"], "hi")]),
+			]
+			
+			self.loopTests(args, expecteds, _list_ser)
 		
-		args = [
-			[],
-			[5],
-			["bee"],
-			[["bee"]],
-			[5, "hi"],
-			[5, ["bee"], "hi"],
-		]
+		# def test_tuple(self): # Since '_tuple_ser' is just a call to '_list_ser', it is redundant
 		
-		expecteds = [
-			b"",
-			
-			b"\x07\x03int\x02\xFF\x05",
-			
-			b"\x08\x03str\x03bee",
-			
-			b"\x0F\x04list\x09" + \
-				b"\x08\x03str\x03bee",
-			
-			b"\x07\x03int\x02\xFF\x05" + \
-			b"\x07\x03str\x02hi",
-			
-			b"\x07\x03int\x02\xFF\x05" + \
-			b"\x0F\x04list\x09" + \
-				b"\x08\x03str\x03bee" + \
-			b"\x07\x03str\x02hi",
-		]
+		# def test_set(self): # Since '_set_ser' is just a call to '_list_ser', it is redundant
 		
-		extraAsserts = [
-			lambda: notSer.assert_has_calls([call(5)]),
-			lambda: notSer.assert_has_calls([call("bee")]),
-			lambda: notSer.assert_has_calls([call(["bee"])]),
-			lambda: notSer.assert_has_calls([call(5, "hi")]),
-			lambda: notSer.assert_has_calls([call(5, ["bee"], "hi")]),
-		]
+		# def test_frozenset(self): # Since '_frozenset_ser' is just a call to '_list_ser', it is redundant
 		
-		self.loopTests(args, expecteds, _list_ser)
+		# @patch(__name__ + "._list_ser")
+		# def test_dict(self, notListSer): # I could test this, but it's too simple for me to bother
 	
-	# def test_tuple(self): # Since '_tuple_ser' is just a call to '_list_ser', it is redundant
-	
-	# def test_set(self): # Since '_set_ser' is just a call to '_list_ser', it is redundant
-	
-	# def test_frozenset(self): # Since '_frozenset_ser' is just a call to '_list_ser', it is redundant
-	
-	# @patch(__name__ + "._list_ser")
-	# def test_dict(self, notListSer): # I could test this, but it's too simple for me to bother
-
-class testDeserializers(testLooperMixin):
-	def test_bytes(self):
-		arg = b"lwiherkjtghjfd"
-		expected = b"lwiherkjtghjfd"
-		result = _bytes_des(arg)
-		self.assertEqual(result, expected)
-	
-	# def test_str(self): # Too simple to write a test for as of now (except maybe the part where it uses 'utf-8', which doesn't encode arbitrary strings)
-	
-	# def test_int(self): # Unessecary since we've already tested 'intToVLQ' and 'VLQToInt' earlier
-	
-	# def test_bool(self): # Too simple to write a test for as of now
-	
-	# def test_float(self): # Too simple to write a test for as of now
-	
-	# def test_complex(self): # Too simple to write a test for as of now
-	
-	@patch(__name__ + ".Des")
-	def test_list(self, notDes):
-		notDes.side_effect = [
-			5,
-			"bee",
-			["bee"],
-			5, "hi",
-			5, ["bee"], "hi",
-		]
+	class testDeserializers(testLooperMixin):
+		def test_bytes(self):
+			arg = b"lwiherkjtghjfd"
+			expected = b"lwiherkjtghjfd"
+			result = _bytes_des(arg)
+			self.assertEqual(result, expected)
 		
-		args = [
-			b"",
-			
-			b"\x07\x03int\x02\xFF\x05",
-			
-			b"\x08\x03str\x03bee",
-			
-			b"\x0F\x04list\x09" + \
-				b"\x08\x03str\x03bee",
-			
-			b"\x07\x03int\x02\xFF\x05" + \
-			b"\x07\x03str\x02hi",
-			
-			b"\x07\x03int\x02\xFF\x05" + \
-			b"\x0F\x04list\x09" + \
-				b"\x08\x03str\x03bee" + \
-			b"\x07\x03str\x02hi",
-		]
+		# def test_str(self): # Too simple to write a test for as of now (except maybe the part where it uses 'utf-8', which doesn't encode arbitrary strings)
 		
-		expecteds = [
-			[],
-			[5],
-			["bee"],
-			[["bee"]],
-			[5, "hi"],
-			[5, ["bee"], "hi"],
-		]
+		# def test_int(self): # Too simple to write a test for as of now
 		
-		extraAsserts = [
-			lambda: notDes.assert_has_calls([
-				call(b"\x03int\x02\xFF\x05")
-			]),
-			lambda: notDes.assert_has_calls([
-				call(b"\x03str\x03bee")
-			]),
-			lambda: notDes.assert_has_calls([
-				call(b"\x04list\x09" + \
-					b"\x08\x03str\x03bee"),
-			]),
-			lambda: notDes.assert_has_calls([
-				call(b"\x03int\x02\xFF\x05"),
-				call(b"\x03str\x02hi"),
-			]),
-			lambda: notDes.assert_has_calls([
-				call(b"\x03int\x02\xFF\x05"),
-				call(b"\x04list\x09" + \
-					b"\x08\x03str\x03bee"),
-				call(b"\x03str\x02hi"),
-			]),
-		]
+		# def test_bool(self): # Too simple to write a test for as of now
 		
-		self.loopTests(args, expecteds, _list_des)
+		# def test_float(self): # Too simple to write a test for as of now
+		
+		# def test_complex(self): # Too simple to write a test for as of now
+		
+		@patch(__name__ + ".Des")
+		def test_list(self, notDes):
+			notDes.side_effect = [
+				5,
+				"bee",
+				["bee"],
+				5, "hi",
+				5, ["bee"], "hi",
+			]
+			
+			args = [
+				b"",
+				
+				LEB.fromInt(len(obj5)) + obj5,
+				
+				LEB.fromInt(len(objbee)) + objbee,
+				
+				LEB.fromInt(len(objlist)) + objlist,
+				
+				LEB.fromInt(len(obj5)) + obj5 + \
+				LEB.fromInt(len(objhi)) + objhi,
+				
+				LEB.fromInt(len(obj5)) + obj5 + \
+				LEB.fromInt(len(objlist)) + objlist + \
+				LEB.fromInt(len(objhi)) + objhi,
+			]
+			
+			expecteds = [
+				[],
+				[5],
+				["bee"],
+				[["bee"]],
+				[5, "hi"],
+				[5, ["bee"], "hi"],
+			]
+			
+			extraAsserts = [
+				lambda: notDes.assert_has_calls([
+					call(obj5)
+				]),
+				lambda: notDes.assert_has_calls([
+					call(objbee)
+				]),
+				lambda: notDes.assert_has_calls([
+					call(objlist),
+				]),
+				lambda: notDes.assert_has_calls([
+					call(obj5),
+					call(objhi),
+				]),
+				lambda: notDes.assert_has_calls([
+					call(obj5),
+					call(objlist),
+					call(objhi),
+				]),
+			]
+			
+			self.loopTests(args, expecteds, _list_des)
+		
+		# def test_tuple(self): # Since '_tuple_des' is just a call to '_list_des', it is redundant
+		
+		# def test_set(self): # Since '_set_des' is just a call to '_list_des', it is redundant
+		
+		# def test_frozenset(self): # Since '_frozenset_des' is just a call to '_list_des', it is redundant
+		
+		# @patch(__name__ + "._list_des")
+		# def test_dict(self, notListDes): # I could test this, but it's too simple for me to bother
 	
-	# def test_tuple(self): # Since '_tuple_des' is just a call to '_list_des', it is redundant
-	
-	# def test_set(self): # Since '_set_des' is just a call to '_list_des', it is redundant
-	
-	# def test_frozenset(self): # Since '_frozenset_des' is just a call to '_list_des', it is redundant
-	
-	# @patch(__name__ + "._list_des")
-	# def test_dict(self, notListDes): # I could test this, but it's too simple for me to bother
+	return [testSerializers, testDeserializers]
 
 if __name__ == "__main__":
+	[testSerializers, testDeserializers] = __scopewrapper()
 	unittest.main()

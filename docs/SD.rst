@@ -9,9 +9,7 @@ Backend Interface
 
 .. autofunction:: strToBytes
 .. autofunction:: bytesToStr
-.. autofunction:: intToVLQ
-.. autofunction:: VLQToInt
-.. autofunction:: skipVLQ
+.. autoexception:: ObeseMessageException
 .. autofunction:: pascalify
 .. autofunction:: depascalify
 .. autofunction:: peel
@@ -110,5 +108,5 @@ implementation were not provided out-of-the-box::
 
 NOTE: 'Ser' and 'Des' will automatically take care of the overhead of labeling
 the type of the object and specifying the length of the blob for you, so all you
-have to do to serialize the object is to return an unambiguous blob that you can
-provide a deserializer for.
+have to do to serialize the object is to return an unambiguous blob for which
+you can provide a deserializer.
