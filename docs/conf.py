@@ -22,7 +22,7 @@ copyright = '2020, Stephen Fedele'
 author = 'Stephen Fedele'
 
 # The full version, including alpha/beta/rc tags
-release = '0.9.0'
+release = '0.9.1'
 
 
 # -- General configuration ---------------------------------------------------

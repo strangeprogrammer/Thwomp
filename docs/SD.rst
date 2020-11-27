@@ -2,7 +2,7 @@
 (De)Serialization
 =================
 
-.. automodule:: SD
+.. automodule:: ToBeGreen.SD
 
 Backend Interface
 =================

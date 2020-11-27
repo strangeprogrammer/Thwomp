@@ -2,7 +2,7 @@
 Verification
 ============
 
-.. automodule:: V
+.. automodule:: ToBeGreen.V
 
 Backend Interface
 =================

@@ -2,7 +2,7 @@
 
 set -e
 
-./SD.py
-./V.py
+./ToBeGreen/SD.py
+./ToBeGreen/V.py
 make -C ./docs/ clean
 make -C ./docs/ html
